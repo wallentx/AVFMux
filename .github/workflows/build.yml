@@ -1,0 +1,105 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - main
+      - 'wallentx/**'
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+  pull_request:
+    branches:
+      - main
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: avfmux-build-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    # Same-repository branches already build on push.
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name != github.repository ||
+      !startsWith(github.head_ref, 'wallentx/')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v7
+
+      - name: Set up Java
+        uses: actions/setup-java@v6.0.1
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: platform-tools
+
+      # The runner image does not ship API 37 or Nexus-compatible build-tools.
+      # API 37 publishes as android-37.0, which does not match compileSdk 37;
+      # the minor-versioned platform (37.2) must be installed explicitly.
+      - name: Install SDK components
+        run: sdkmanager 'platforms;android-37.2' 'build-tools;37.0.0'
+
+      - name: Validate Gradle wrapper
+        uses: gradle/actions/wrapper-validation@v4
+
+      - name: Run unit tests and build debug APK
+        shell: bash {0}
+        run: |
+          exit_on_error() { echo "$1"; exit 1; }
+
+          if ! ./gradlew :app:testDebugUnitTest :app:assembleDebug; then
+            exit_on_error "Test/build failed."
+          fi
+
+          APK_DIR_PATH="./app/build/outputs/apk/debug"
+          if ! test -f "$APK_DIR_PATH/app-debug.apk"; then
+            exit_on_error "Failed to find built APK at '$APK_DIR_PATH/app-debug.apk'. Files found: $(ls "$APK_DIR_PATH")"
+          fi
+
+      - name: Verify APK manifest invariants
+        shell: bash
+        run: |
+          apk="./app/build/outputs/apk/debug/app-debug.apk"
+          APKANALYZER=$(command -v apkanalyzer || echo "$ANDROID_HOME/cmdline-tools/latest/bin/apkanalyzer")
+          if ! test -x "$APKANALYZER"; then
+            echo "apkanalyzer not found or not executable at '$APKANALYZER'"
+            exit 1
+          fi
+          # The fork must keep the upstream package identity and VM permissions.
+          "$APKANALYZER" manifest target-sdk "$apk" | grep -x 37
+          "$APKANALYZER" manifest print "$apk" | grep -q 'android.permission.MANAGE_VIRTUAL_MACHINE'
+          "$APKANALYZER" manifest print "$apk" | grep -q 'android.permission.USE_CUSTOM_VIRTUAL_MACHINE'
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: avfmux-debug
+          path: |
+            app/build/outputs/apk/debug/app-debug.apk
+            app/build/outputs/apk/debug/output-metadata.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Preserve test reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: unit-test-reports
+          path: |
+            app/build/test-results/**
+            app/build/reports/tests/**
+          if-no-files-found: ignore
+          retention-days: 7
