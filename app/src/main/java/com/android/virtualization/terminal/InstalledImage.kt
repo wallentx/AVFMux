@@ -33,7 +33,8 @@ import kotlin.math.ceil
 
 /** Collection of files that consist of a VM image. */
 public class InstalledImage private constructor(val installDir: Path) {
-    private val rootPartition: Path = installDir.resolve(ROOTFS_FILENAME)
+    /** The path to the guest's root filesystem disk. */
+    val rootPartition: Path = installDir.resolve(ROOTFS_FILENAME)
     val backupFile: Path = installDir.resolve(BACKUP_FILENAME)
 
     /** The path to the VM config file. */
@@ -194,7 +195,8 @@ public class InstalledImage private constructor(val installDir: Path) {
 
     companion object {
         const val INSTALL_DIRNAME = "linux"
-        private const val ROOTFS_FILENAME = "root_part"
+        /** Root filesystem disk filename. */
+        const val ROOTFS_FILENAME = "root_part"
         private const val BACKUP_FILENAME = "root_part_backup"
         const val CONFIG_FILENAME = "vm_config.json"
         private const val BUILD_ID_FILENAME = "build_id"

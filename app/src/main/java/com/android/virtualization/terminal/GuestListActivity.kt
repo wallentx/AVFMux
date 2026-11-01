@@ -16,29 +16,34 @@
 package com.android.virtualization.terminal
 
 import android.os.Bundle
+import android.os.Environment
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.appbar.MaterialToolbar
+import java.io.File
 
 /**
  * Lists the guests this app can see.
  *
  * Launchable guests start a terminal session through the existing [VmLauncherService] lifecycle.
- * Guests that were detected but cannot be launched are still listed, with the reason shown, so
- * the limitation is visible rather than silently hidden.
+ * Guests whose descriptor lives outside this app's storage are still listed with the exact reason
+ * they cannot be launched, so the limitation is visible rather than silently hidden.
  */
 class GuestListActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.guest_list)
 
-        val registry = GuestRegistry(this)
+        val registry = GuestRegistry(this, externalDescriptorRoot())
         val rows = registry.list().map { guest ->
             val installed = registry.isInstalled(guest)
+            // Debian stays selectable even when uninstalled: selecting it runs upstream
+            // installIfNecessary() -> InstallerActivity. Other guests need full launchability.
+            val launchable = registry.isLaunchable(guest) || guest.id == Guest.DEBIAN_ID
             GuestRow(
                 guest = guest,
-                launchable = GuestRegistry.isLaunchable(guest, installed = installed),
+                launchable = launchable,
                 detail =
                     when {
                         guest.unavailableReason != null -> guest.unavailableReason
@@ -55,6 +60,19 @@ class GuestListActivity : AppCompatActivity() {
         val toolbar: MaterialToolbar = findViewById(R.id.guest_list_toolbar)
         toolbar.setNavigationOnClickListener { finish() }
     }
+
+    /**
+     * App-visible location holding external `*.json` descriptors.
+     *
+     * This is the only place the Downloads path is resolved, keeping it out of the registry so the
+     * registry logic stays JVM-testable. If external storage is unavailable, the registry returns
+     * an empty external list and logs it.
+     */
+    private fun externalDescriptorRoot(): File =
+        File(
+            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+            GuestRegistry.EXTERNAL_DESCRIPTOR_SUBDIR,
+        )
 }
 
 /** One row of the guest list: a guest definition plus its launchability. */

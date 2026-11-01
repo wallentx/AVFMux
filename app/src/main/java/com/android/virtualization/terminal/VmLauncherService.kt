@@ -223,9 +223,9 @@ class VmLauncherService : Service() {
         resultReceiver: ResultReceiver,
     ) {
         // Track the selected guest so the rest of the lifecycle (logging, storage balloon, gRPC
-        // service and shutdown) all address the same guest.
+        // service and shutdown) all address the same guest. Set before anything reads `this.image`.
         this.image = image
-        val json = ConfigJson.from(this, image.configPath, guest)
+        val json = ConfigJson.from(this, image.configPath, image.installDir.toString())
         val configBuilder = json.toConfigBuilder(this)
         val customImageConfigBuilder = json.toCustomImageConfigBuilder(this)
 

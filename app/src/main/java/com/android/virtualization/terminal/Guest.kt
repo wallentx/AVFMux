@@ -22,8 +22,9 @@ package com.android.virtualization.terminal
  * distribution, where its config and disk live); runtime state (running/stopped) is owned by
  * AVF and is never stored here.
  *
- * [id] must be stable and filesystem-safe. [installDirName] is the directory under the app's
- * filesDir that holds this guest's config and disk.
+ * [id] must be stable and filesystem-safe. [installDirName] is the directory name under the app's
+ * filesDir that holds this guest's config and disk; [installDir] carries an absolute path only for
+ * external descriptors, which this app never launches.
  */
 data class Guest(
     val id: String,
@@ -31,20 +32,24 @@ data class Guest(
     val distribution: String,
     val installDirName: String,
     /**
-     * True when this guest's config and disk live outside the app's private storage. Such guests
+     * True when this guest's descriptor was found outside the app's private storage. Such guests
      * cannot be launched by the app itself; they are reported but not bootable.
      */
     val external: Boolean = false,
+    /** Absolute install directory, set only for external descriptors. */
+    val installDir: String? = null,
     /** Human-readable reason this guest cannot be launched, or null when it can. */
     val unavailableReason: String? = null,
 ) {
-    /** True when this guest's config and disk can be opened by this app. */
+    /** True when this guest's config and disk are inside this app's private storage. */
     val launchableByStorage: Boolean
         get() = !external
 
     /** Stable identity of the stock Debian guest installed by upstream TerminalApp. */
     companion object {
         const val DEBIAN_ID: String = "debian"
+
+        /** Upstream install directory name; the single source of truth is [InstalledImage]. */
         const val DEBIAN_INSTALL_DIRNAME: String = InstalledImage.INSTALL_DIRNAME
 
         val DEBIAN: Guest =

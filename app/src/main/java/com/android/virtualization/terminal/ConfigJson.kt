@@ -296,11 +296,21 @@ internal data class ConfigJson(
     companion object {
         private const val DEBUG = true
 
-        /** Parses JSON file at jsonPath */
-        fun from(context: Context, jsonPath: Path, guest: Guest = Guest.DEBIAN): ConfigJson {
+        /**
+         * Parses JSON file at jsonPath.
+         *
+         * [payloadDir] resolves the `$PAYLOAD_DIR` keyword. It defaults to the stock Debian install
+         * dir, so upstream behavior is unchanged; callers launching another guest pass that guest's
+         * own install dir.
+         */
+        fun from(
+            context: Context,
+            jsonPath: Path,
+            payloadDir: String = InstalledImage.getDefault(context).installDir.toString(),
+        ): ConfigJson {
             try {
                 FileReader(jsonPath.toFile()).use { fileReader ->
-                    val content = replaceKeywords(fileReader, context, guest)
+                    val content = replaceKeywords(fileReader, context, payloadDir)
                     return Gson().fromJson<ConfigJson?>(content, ConfigJson::class.java)
                 }
             } catch (e: Exception) {
@@ -309,10 +319,9 @@ internal data class ConfigJson(
         }
 
         @Throws(IOException::class)
-        private fun replaceKeywords(r: Reader, context: Context, guest: Guest = Guest.DEBIAN): String {
+        private fun replaceKeywords(r: Reader, context: Context, payloadDir: String): String {
             // $PAYLOAD_DIR resolves to the selected guest's install dir so that a second guest's
             // config can reference its own disk without duplicating config-parsing logic.
-            val payloadDir = GuestRegistry(context).installedImage(guest).installDir.toString()
             val rules: Map<String, String> =
                 mapOf(
                     "\\\$PAYLOAD_DIR" to payloadDir,

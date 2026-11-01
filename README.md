@@ -23,12 +23,33 @@ No ISO/IMG provisioning or VM-format conversion is implemented.
 
 | Guest | Storage | Launchable by AVFMux |
 |---|---|---|
-| Debian (stock) | `<filesDir>/linux` | Yes, when installed |
-| AVFMux-registered guests | `<filesDir>/guests/<id>` (must contain `vm_config.json`) | Yes, when installed |
-| Arch Linux (declared external) | `/data/local/tmp/termux-arch-v2` (shell-owned) | No — listed with an explicit reason |
+| Debian (stock) | `<filesDir>/linux` | Yes when installed; selecting it when absent runs the upstream installer |
+| AVFMux-registered guest | `<filesDir>/guests/<installDirName>` | Yes only when `guest.json`, `vm_config.json`, `completed`, and `root_part` all exist |
+| External descriptor (e.g. Arch) | any app-visible `installDir`, declared by the user | No — listed with the exact reason it cannot launch |
 
-Directories under `guests/` without a real `vm_config.json` are skipped, so a stray directory
-cannot become a phantom guest. Nothing in the registry writes, moves, or migrates guest data.
+A directory under `guests/` is ignored unless all four files above are present and its
+`guest.json` names a safe single-component install directory. A stray or partial directory
+therefore cannot become a phantom guest. Nothing in the registry writes, moves, deletes,
+imports, or migrates guest data.
+
+External guests are declared, never discovered silently. AVFMux reads descriptors from
+`Download/AVFMux/guests/*.json`:
+
+```json
+{
+  "id": "arch",
+  "displayName": "Arch Linux",
+  "distribution": "Arch Linux",
+  "installDir": "/data/local/tmp/termux-arch-v2",
+  "note": "created by Termux:API"
+}
+```
+
+The registry probes that path only to explain the result. On this device the Arch install dir
+is shell-owned, so the row reads "install dir not accessible to this app (app sandbox)". If a
+descriptor points at a readable bundle, it still says "external bundle is outside app-private
+storage and is not imported or launched by this build": AVFMux does not attach to or import
+another owner's VM. There is no hard-coded guest path in the source.
 
 ## Verified platform limits
 
@@ -38,14 +59,17 @@ These are Android/AVF boundaries, not implementation shortcuts:
   `create`/`get`/`getOrCreate`/`delete`/`importFromDescriptor`.
 - A normal app cannot read another app's private storage or the shell-owned
   `/data/local/tmp`, and cannot read `/data/misc/virtualizationservice`.
-- AVF exposes **no host-side attach** to a VM owned by another requester.
+- The upstream console attach is a guest-side TCP (mDNS `ttyd`) connection to the VM this app
+  started; AVF exposes no host-side attach to a VM owned by another requester.
 - `MANAGE_VIRTUAL_MACHINE` and `USE_CUSTOM_VIRTUAL_MACHINE` are `signature|privileged`
   permissions. A sideloaded APK compiles but cannot hold them.
+- Whether a privileged system install can read the shell-owned Arch bundle or take over the
+  existing VM is **unverified** and not implemented here. AVFMux neither destroys nor migrates
+  either existing guest.
 
-Therefore the existing Arch guest is displayed as *declared external* and is not launched by
-AVFMux. Launching it requires either a privileged (system/priv-app) install that can hold the
-VM permissions and reference the external image, or importing the guest into AVFMux's own
-storage. Neither path is implemented here.
+Therefore the existing Arch guest appears only when a user descriptor declares it, and it is
+not launched by AVFMux. Launching it would require an ownership/import mechanism that AVF does
+not expose to this app; that is deliberately out of scope for this slice.
 
 Full evidence is in [`docs/discovery-findings.md`](docs/discovery-findings.md).
 

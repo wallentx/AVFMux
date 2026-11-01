@@ -18,37 +18,58 @@ package com.android.virtualization.terminal
 import com.google.gson.Gson
 
 /**
- * Optional metadata for a guest definition (`guest.json`).
+ * Metadata for a guest descriptor (`guest.json`).
  *
- * Deliberately minimal: only presentation metadata lives here. Boot configuration stays in the
- * guest's own `vm_config.json`, so this file never has to be kept in sync with AVF's schema.
+ * Boot configuration stays in the guest's own `vm_config.json`, so this file never has to be kept
+ * in sync with AVF's schema. Only presentation metadata and the install location live here.
  *
- * Both fields are nullable: a manifest may name the guest, describe its distribution, or just be
- * an empty object. Callers ([GuestRegistry.list]) substitute a fallback (the directory id and
- * "Unknown") when a field is absent.
+ * The same shape is used for both kinds of descriptor:
+ *
+ *  - app-owned (`filesDir/guests/<dir>/guest.json`): [installDirName] selects the subdirectory
+ *    under `filesDir/guests`; [installDir] is normally absent.
+ *  - external (`Download/AVFMux/guests/<name>.json`): [installDir] is the absolute install
+ *    directory, because an external descriptor cannot be resolved relative to app storage.
+ *
+ * [id] and [displayName] are required and must be non-blank; [parse] throws
+ * [IllegalArgumentException] when they are missing so a malformed descriptor is rejected instead
+ * of producing a phantom guest.
  */
 data class GuestManifest(
+    val id: String? = null,
     val displayName: String? = null,
     val distribution: String? = null,
+    val installDirName: String? = null,
+    val installDir: String? = null,
+    val note: String? = null,
 ) {
+    /** Distribution label, defaulting to "Unknown" when the descriptor omits it. */
+    fun distributionOrDefault(): String =
+        if (distribution.isNullOrBlank()) DEFAULT_DISTRIBUTION else distribution
+
     companion object {
         private val gson = Gson()
 
+        /** Distribution shown when a descriptor does not name one. */
+        const val DEFAULT_DISTRIBUTION: String = "Unknown"
+
         /**
-         * Parses a `guest.json` manifest with Gson.
+         * Parses a `guest.json` descriptor with Gson.
          *
-         * Returns null when the text is empty or not valid JSON. Malformed content is reported by
-         * the caller ([GuestRegistry.readManifest]) rather than throwing out of here, so a broken
-         * manifest can never hide a guest directory.
+         * @throws IllegalArgumentException when the text is blank, not valid JSON, or lacks a
+         *   non-blank `id`/`displayName`.
          */
-        fun parse(text: String): GuestManifest? {
-            if (text.isBlank()) return null
-            return try {
-                val parsed = gson.fromJson(text, GuestManifest::class.java)
-                if (parsed == null) null else parsed
-            } catch (e: Exception) {
-                null
-            }
+        fun parse(json: String): GuestManifest {
+            require(json.isNotBlank()) { "guest descriptor is empty" }
+            val parsed =
+                try {
+                    gson.fromJson(json, GuestManifest::class.java)
+                } catch (e: Exception) {
+                    throw IllegalArgumentException("guest descriptor is not valid JSON", e)
+                }
+            requireNotNull(parsed) { "guest descriptor is empty" }
+            require(!parsed.id.isNullOrBlank()) { "guest descriptor has no id" }
+            require(!parsed.displayName.isNullOrBlank()) { "guest descriptor has no displayName" }
+            return parsed
         }
     }
 }

@@ -87,7 +87,36 @@ public class MainActivity :
 
         image = InstalledImage.getDefault(this)
 
-        val launchInstaller = installIfNecessary()
+        // Resolve which guest this activity was asked to boot. With no extra, this is the stock
+        // Debian guest, and the code below follows the upstream path exactly.
+        val guestRegistry = GuestRegistry(this)
+        val selectedGuest = guestRegistry.find(intent.getStringExtra(EXTRA_GUEST_ID))
+        val selectedImage =
+            if (selectedGuest.external) {
+                Log.e(TAG, "Guest ${selectedGuest.id} is not launchable: ${selectedGuest.unavailableReason}")
+                finish()
+                return
+            } else {
+                guestRegistry.installedImage(selectedGuest)
+            }
+        // The field must address the selected guest, not always Debian. For the stock Debian guest
+        // this is the same path as upstream, so default behavior is unchanged.
+        image = selectedImage
+
+        // Debian is the guest the upstream installer provisions: only that guest may trigger it.
+        // A non-Debian guest never runs the Debian installer; if it is not launchable we stop here
+        // without destroying anything.
+        val launchInstaller =
+            if (selectedGuest.id == Guest.DEBIAN_ID) {
+                installIfNecessary()
+            } else {
+                if (!guestRegistry.isLaunchable(selectedGuest)) {
+                    Log.e(TAG, "Guest ${selectedGuest.id} is not launchable; not launching installer")
+                    finish()
+                    return
+                }
+                false
+            }
 
         initializeUi()
 
@@ -105,7 +134,12 @@ public class MainActivity :
 
         // if installer is launched, it will be handled in onActivityResult
         if (!launchInstaller) {
-            if (image.isOlderThanCurrentVersion()) {
+            if (selectedGuest.id != Guest.DEBIAN_ID) {
+                // A non-Debian guest has no build_id, so the Debian upgrade check would misread it
+                // as outdated; and its artifacts are app-private, so the all-files prompt does not
+                // apply. Launch it directly.
+                startVm()
+            } else if (image.isOlderThanCurrentVersion()) {
                 val intent = Intent(this, UpgradeActivity::class.java)
                 intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_NEW_TASK)
                 startActivity(intent)
@@ -344,8 +378,13 @@ public class MainActivity :
     private fun startVm() {
         val guestRegistry = GuestRegistry(this)
         val guest = guestRegistry.find(intent.getStringExtra(EXTRA_GUEST_ID))
+        if (guest.external) {
+            Log.e(TAG, "Guest ${guest.id} is not launchable: ${guest.unavailableReason}")
+            return
+        }
         val image = guestRegistry.installedImage(guest)
-        if (!image.isInstalled()) {
+        if (!guestRegistry.isLaunchable(guest)) {
+            Log.e(TAG, "Guest ${guest.id} is not fully launchable; refusing to launch")
             return
         }
 

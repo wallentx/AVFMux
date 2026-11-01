@@ -69,7 +69,7 @@ the manifest, `GuestListActivity` is registered, and `Android.bp` keeps `platfor
 | Item | Status |
 |---|---|
 | Registry logic compilation | **Verified locally** (Gradle 9.6.0, JDK 21; JDK 17 in CI) |
-| 11 registry unit tests | **Verified locally**: 11 tests, 0 failures |
+| 11 registry unit tests | **Verified locally**: 17 tests, 0 failures |
 | Manifest/blueprint invariants | **Verified statically** |
 | Soong APK assembly | **UNVERIFIED** — requires an AOSP source tree |
 | APK install/launch on device | **UNVERIFIED** — requires a privileged install holding `MANAGE_VIRTUAL_MACHINE` |

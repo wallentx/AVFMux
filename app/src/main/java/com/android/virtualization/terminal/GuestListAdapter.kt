@@ -21,7 +21,6 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
-import android.widget.Toast
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.card.MaterialCardView
 
@@ -31,9 +30,9 @@ import com.google.android.material.card.MaterialCardView
  * Selecting a launchable guest reuses the existing VM lifecycle: it starts [MainActivity] with
  * the guest id, and that activity starts [VmLauncherService] exactly as it did before.
  *
- * Rows that are external or not installed are still tappable, but they never start
- * [MainActivity]. Tapping one explains why it cannot launch and returns, so a guest whose
- * artifacts live outside this app cannot leak into the launch path.
+ * Rows that are external are not clickable at all; their subtitle states the exact reason they
+ * cannot launch. App-owned rows are clickable only when launchable, and only those pass
+ * [MainActivity.EXTRA_GUEST_ID], so an unavailable guest cannot leak into the launch path.
  */
 class GuestListAdapter(private val context: Context, private val rows: List<GuestRow>) :
     RecyclerView.Adapter<GuestListAdapter.ViewHolder>() {
@@ -55,20 +54,22 @@ class GuestListAdapter(private val context: Context, private val rows: List<Gues
         val row = rows[position]
         viewHolder.title.text = row.guest.displayName
         viewHolder.subTitle.text = row.detail
-        // Unavailable guests stay visible and remain tappable only to explain why they cannot
-        // launch; the launch path below is gated on row.launchable.
-        viewHolder.card.isClickable = true
-        viewHolder.card.isEnabled = true
-        viewHolder.card.setOnClickListener {
-            if (!row.launchable) {
-                val reason = row.guest.unavailableReason ?: row.detail
-                Toast.makeText(context, reason, Toast.LENGTH_LONG).show()
-                return@setOnClickListener
+
+        // External guests are reported only: never tappable, never launched.
+        val clickable = row.launchable && !row.guest.external
+        viewHolder.card.isClickable = clickable
+        viewHolder.card.isEnabled = clickable
+        viewHolder.card.setOnClickListener(
+            if (clickable) {
+                View.OnClickListener {
+                    val intent = Intent(context, MainActivity::class.java)
+                    intent.putExtra(MainActivity.EXTRA_GUEST_ID, row.guest.id)
+                    context.startActivity(intent)
+                }
+            } else {
+                null
             }
-            val intent = Intent(context, MainActivity::class.java)
-            intent.putExtra(MainActivity.EXTRA_GUEST_ID, row.guest.id)
-            context.startActivity(intent)
-        }
+        )
     }
 
     override fun getItemCount() = rows.size
