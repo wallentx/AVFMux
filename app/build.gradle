@@ -12,8 +12,8 @@ android {
 
     defaultConfig {
         applicationId "com.android.virtualization.terminal"
-        minSdk Integer.valueOf(minSdkVersion.toString())
-        targetSdk Integer.valueOf(targetSdkVersion.toString())
+        minSdk 35
+        targetSdk 37
         versionCode 1
         versionName "0.1.0"
 
