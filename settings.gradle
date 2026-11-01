@@ -1,6 +1,5 @@
 pluginManagement {
     repositories {
-        google()
         mavenCentral()
         gradlePluginPortal()
     }
@@ -9,10 +8,13 @@ pluginManagement {
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
-        google()
         mavenCentral()
     }
 }
 
 rootProject.name = "AVFMux"
-include ':app'
+
+// The Android app itself is built by Soong from Android.bp inside the AOSP tree:
+// its sources need platform_apis and Soong-only static libs that no public SDK or
+// Maven repository provides. Only the pure registry logic is buildable here.
+include ':logic'

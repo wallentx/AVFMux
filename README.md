@@ -51,16 +51,23 @@ Full evidence is in [`docs/discovery-findings.md`](docs/discovery-findings.md).
 
 ## Build
 
-CI (`.github/workflows/build.yml`) installs API 37.2 + build-tools 37.0.0 and runs
-`:app:testDebugUnitTest :app:assembleDebug`, then asserts the merged manifest retains
-`MANAGE_VIRTUAL_MACHINE` and `USE_CUSTOM_VIRTUAL_MACHINE`.
+AVFMux is built as its upstream ancestor is: an AOSP/Soong `android_app` with
+`platform_apis: true` and `privileged: true` (root `Android.bp`). Assembly therefore happens
+inside an AOSP source tree; the public SDK and Maven cannot provide the hidden
+`android.system.virtualmachine` APIs or AOSP-only libraries (`debian-service-grpclib-lite`,
+`framework-virtualization.impl`, `libforwarder_host_jni`, …).
 
-Local toolchain: JDK 17, Gradle 9.6.0 (wrapper), AGP 9.5.0 with built-in Kotlin
-(`compileSdk 37`, minor 2; `minSdk 35`; `targetSdk 37`).
+The new registry logic is independently compiled and tested on the JVM:
 
 ```sh
-./gradlew :app:testDebugUnitTest :app:assembleDebug
+./gradlew :logic:test
 ```
+
+CI runs those tests and checks static invariants: both VM permissions, the registered
+`GuestListActivity`, and the Soong flags/libraries in `Android.bp`.
+
+Soong APK assembly and on-device launch are **unverified in this environment**; see
+[`docs/build-model.md`](docs/build-model.md) for the verified build-model evidence.
 
 ## License
 

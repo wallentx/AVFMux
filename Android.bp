@@ -1,0 +1,81 @@
+// AVFMux: an Apache-2.0 fork of AOSP packages/apps/TerminalApp.
+//
+// This module is built *inside the AOSP tree*, not with a public-SDK Gradle plugin.
+// Upstream TerminalApp is an `android_app` with `platform_apis: true`; it links against
+// Soong-only static libs (avf_aconfig_flags_java, android.system.virtualizationservice_internal-java,
+// debian-service-grpclib-lite, libcrosvm_android_display_service-java, MicrodroidTestHelper,
+// framework-virtualization.impl) that do not exist in the public SDK or on Maven.
+//
+// The package stays `com.android.virtualization.terminal` on purpose: the fork must keep
+// upstream's package identity, the privileged VM permissions (MANAGE_VIRTUAL_MACHINE,
+// USE_CUSTOM_VIRTUAL_MACHINE) and the `android.virtualization.VM_TERMINAL` intent filter.
+// This module replaces upstream `VmTerminalApp` in the tree; do not install both.
+
+package {
+    default_applicable_licenses: ["Android-Apache-2.0"],
+}
+
+android_app {
+    name: "AvfMux",
+    srcs: [
+        "app/src/main/java/**/*.java",
+        "app/src/main/java/**/*.kt",
+    ],
+    asset_dirs: ["app/src/main/assets"],
+    resource_dirs: ["app/src/main/res"],
+    manifest: "app/src/main/AndroidManifest.xml",
+    static_libs: [
+        // TODO(b/330257000): will be removed when binder RPC is used
+        "android.system.virtualizationservice_internal-java",
+        "androidx-constraintlayout_constraintlayout",
+        "androidx.navigation_navigation-fragment-ktx",
+        "androidx.window_window",
+        "androidx.work_work-runtime",
+        "apache-commons-compress",
+        "avf_aconfig_flags_java",
+        "com.google.android.material_material",
+        "debian-service-grpclib-lite",
+        "gson",
+        // TODO(b/331708504): will be removed when AVF framework handles surface
+        "libcrosvm_android_display_service-java",
+        // Fork-local AIDL: replaces upstream "VmTerminalApp.aidl-java".
+        "AvfMux.aidl-java",
+        "MicrodroidTestHelper", // for DeviceProperties class
+    ],
+    jni_libs: [
+        "libforwarder_host_jni",
+    ],
+    libs: [
+        "androidx.annotation_annotation",
+        "framework-virtualization.impl",
+        "framework-annotations-lib",
+    ],
+    use_embedded_native_libs: true,
+    platform_apis: true,
+    privileged: true,
+    optimize: {
+        // TODO(b/377100096): enable bytecode optimization again
+        //optimize: true,
+        proguard_flags_files: ["proguard.flags"],
+        shrink_resources: true,
+        keep_runtime_invisible_annotations: true,
+    },
+    apex_available: [
+        "com.android.virt",
+    ],
+}
+
+aidl_interface {
+    name: "AvfMux.aidl",
+    srcs: ["app/src/main/aidl/**/*.aidl"],
+    unstable: true,
+    local_include_dir: "app/src/main/aidl",
+    backend: {
+        java: {
+            enabled: true,
+            apex_available: [
+                "com.android.virt",
+            ],
+        },
+    },
+}

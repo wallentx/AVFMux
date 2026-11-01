@@ -1,0 +1,47 @@
+plugins {
+    id 'org.jetbrains.kotlin.jvm'
+}
+
+// JVM-only module. The Android app itself is built by Soong from ../Android.bp; this module
+// exists solely to compile and unit-test the pure guest-registry sources on a plain JVM.
+//
+// Source selection: the registry files are staged into a generated source root (build output
+// only, nothing duplicated in the repo) together with the test-only Android stubs, and Gradle's
+// normal Kotlin source set handles compilation and the test classpath.
+
+def appMain = file('../app/src/main/java/com/android/virtualization/terminal')
+def appTest = file('../app/src/test/java/com/android/virtualization/terminal')
+
+def stageRegistrySources = tasks.register('stageRegistrySources', Sync) {
+    from 'src/main/kotlin'
+    from(appMain) { include 'Guest.kt', 'GuestRegistry.kt', 'GuestManifest.kt' }
+    into layout.buildDirectory.dir('generated-registry/main')
+}
+
+def stageRegistryTestSource = tasks.register('stageRegistryTestSource', Sync) {
+    // Keep the package directory so the staged test lands at its real package path.
+    from(appTest) { include 'GuestRegistryTest.kt' }
+    into layout.buildDirectory.dir('generated-registry/test/com/android/virtualization/terminal')
+}
+
+sourceSets {
+    main {
+        kotlin.srcDirs = [layout.buildDirectory.dir('generated-registry/main')]
+        java.srcDirs = []
+    }
+    test {
+        kotlin.srcDirs = [layout.buildDirectory.dir('generated-registry/test')]
+        java.srcDirs = []
+    }
+}
+
+tasks.named('compileKotlin') { dependsOn stageRegistrySources }
+tasks.named('compileTestKotlin') { dependsOn stageRegistryTestSource }
+
+dependencies {
+    implementation 'com.google.code.gson:gson:2.13.2'
+    testImplementation 'junit:junit:4.13.2'
+    // Explicit main output keeps the test compile classpath correct under KGP 2.4's
+    // Build Tools API, which writes classes outside the legacy default directory.
+    testImplementation sourceSets.main.output
+}

@@ -179,7 +179,7 @@ class GuestRegistry(private val context: Context) {
         const val MANIFEST_FILENAME: String = "guest.json"
 
         /** Pure helper: at least the stock Debian guest, always first. */
-        fun listOf(debian: Guest): List<Guest> = listOf(debian)
+        fun listOf(debian: Guest): List<Guest> = kotlin.collections.listOf(debian)
 
         /** Pure helper: resolve a guest id, falling back to Debian for unknown ids. */
         fun resolve(id: String?, guests: List<Guest>): Guest {
