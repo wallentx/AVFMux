@@ -28,16 +28,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Clone repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '17'
 
       - name: Validate Gradle wrapper
-        uses: gradle/actions/wrapper-validation@v4
+        uses: gradle/actions/wrapper-validation@v6
 
       # The Android app itself is a Soong `platform_apis: true` module and cannot be assembled
       # against the public SDK. CI compiles and runs the new, pure registry logic on the JVM.
@@ -72,7 +72,7 @@ jobs:
 
       - name: Preserve test reports
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: logic-test-reports
           path: |
